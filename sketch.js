@@ -1,5 +1,5 @@
 /* =========================================================================
-   PURIFICADOR DE SOLOS - CONTROLO DE ESPÉCIES INVASORAS
+   PURIFICADOR DE SOLOS - CONTROLO DE ESPÉCIES INVASORAS (VISTA AÉREA Top-Down)
    Unidade Curricular: Sistemas Multimédia (EX. Prático)
    Autor: Luís Martinho Oliveira Lopes (Nº 25361) | Sigla: ECGM
    Tema: Sustentabilidade e Ambiente (Controlo de Espécies Invasoras)
@@ -45,38 +45,38 @@ function playSound(type) {
 
   if (type === 'laser') {
     osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(800, now);
-    osc.frequency.exponentialRampToValueAtTime(120, now + 0.15);
-    gain.gain.setValueAtTime(0.3, now);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+    osc.frequency.setValueAtTime(900, now);
+    osc.frequency.exponentialRampToValueAtTime(100, now + 0.18);
+    gain.gain.setValueAtTime(0.35, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.18);
     osc.start(now);
-    osc.stop(now + 0.15);
+    osc.stop(now + 0.18);
   } else if (type === 'hit_invasive') {
     osc.type = 'sine';
     osc.frequency.setValueAtTime(440, now);
-    osc.frequency.exponentialRampToValueAtTime(880, now + 0.2);
+    osc.frequency.exponentialRampToValueAtTime(880, now + 0.22);
     gain.gain.setValueAtTime(0.3, now);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.22);
     osc.start(now);
-    osc.stop(now + 0.2);
+    osc.stop(now + 0.22);
   } else if (type === 'hit_native') {
     osc.type = 'square';
-    osc.frequency.setValueAtTime(150, now);
-    osc.frequency.setValueAtTime(100, now + 0.1);
+    osc.frequency.setValueAtTime(160, now);
+    osc.frequency.setValueAtTime(90, now + 0.12);
     gain.gain.setValueAtTime(0.4, now);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.32);
     osc.start(now);
-    osc.stop(now + 0.3);
+    osc.stop(now + 0.32);
   } else if (type === 'combo') {
     osc.type = 'triangle';
     osc.frequency.setValueAtTime(523.25, now); // C5
     osc.frequency.setValueAtTime(659.25, now + 0.1); // E5
     osc.frequency.setValueAtTime(783.99, now + 0.2); // G5
     osc.frequency.setValueAtTime(1046.50, now + 0.3); // C6
-    gain.gain.setValueAtTime(0.4, now);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+    gain.gain.setValueAtTime(0.45, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.55);
     osc.start(now);
-    osc.stop(now + 0.5);
+    osc.stop(now + 0.55);
   }
 }
 
@@ -89,32 +89,32 @@ let maxComboAchieved = 0;
 
 let plants = [];
 let particles = [];
-let laserAnim = null; // Efeito gráfico do disparo
+let laserAnim = null; // Efeito gráfico de raio laser orbital
 
 let spawnTimer = 0;
-let spawnInterval = 90; // Frames entre nascimento de plantas
+let spawnInterval = 75; // Frames entre germinação de plantas no mapa aéreo
 
 // --- SISTEMA DE COMBOS DE PURIFICAÇÃO (Funcionalidade Original) ---
 // 3 invasoras consecutivas em < 5 segundos = Bónus de Raio de Destruição
 let recentInvasiveTimestamps = [];
 let hasComboBonus = false;
-const COMBO_TIME_WINDOW = 5000; // 5000 ms = 5 segundos
-const NORMAL_LASER_RADIUS = 40;
-const BOOSTED_LASER_RADIUS = 95;
+const COMBO_TIME_WINDOW = 5000; // 5 segundos
+const NORMAL_LASER_RADIUS = 45;
+const BOOSTED_LASER_RADIUS = 105;
 
-// --- CLASSE PLANTA ---
+// --- CLASSE PLANTA (VISTA AÉREA TOP-DOWN) ---
 class Plant {
   constructor(x, y, type) {
     this.x = x;
     this.y = y;
     this.type = type; // 'INVASIVE' (Chorão-das-praias) ou 'NATIVE' (Flora Nativa)
     this.size = 0;
-    this.targetSize = type === 'INVASIVE' ? random(45, 65) : random(35, 50);
-    this.growthSpeed = random(0.8, 1.4);
+    this.targetSize = type === 'INVASIVE' ? random(50, 70) : random(40, 55);
+    this.growthSpeed = random(0.8, 1.3);
     this.alive = true;
     this.age = 0;
-    this.maxAge = type === 'INVASIVE' ? 420 : 600; // Tempo até murchar/desaparecer
-    this.flowerColor = type === 'INVASIVE' ? color(236, 72, 153) : color(251, 191, 36);
+    this.maxAge = type === 'INVASIVE' ? 450 : 650;
+    this.rotation = random(TWO_PI);
   }
 
   update() {
@@ -130,71 +130,76 @@ class Plant {
   draw() {
     push();
     translate(this.x, this.y);
+    rotate(this.rotation);
 
     if (this.type === 'INVASIVE') {
-      // --- PLANT INVASORA: CHORÃO-DAS-PRAIAS (Carpobrotus edulis) ---
-      // Folhas suculentas e pontiagudas triangulares
+      // --- ESPÉCIE INVASORA: CHORÃO-DAS-PRAIAS (Vista Aérea Top-Down) ---
+      // Folhas suculentas triangulares espalhadas em 360°
       stroke(20, 83, 45);
       strokeWeight(2);
       fill(34, 197, 94);
 
-      let leafCount = 8;
+      let leafCount = 10;
       for (let i = 0; i < leafCount; i++) {
-        let angle = (TWO_PI / leafCount) * i + sin(frameCount * 0.05 + this.x) * 0.05;
+        let angle = (TWO_PI / leafCount) * i + sin(frameCount * 0.04 + this.x) * 0.05;
         push();
         rotate(angle);
-        triangle(0, 0, -this.size * 0.25, -this.size * 0.7, this.size * 0.25, -this.size * 0.7);
+        triangle(0, 0, -this.size * 0.22, -this.size * 0.65, this.size * 0.22, -this.size * 0.65);
         pop();
       }
 
-      // Flor central magenta vívida com pétalas finas
-      fill(this.flowerColor);
+      // Centro com flor rosa/magenta vibrante
+      fill(236, 72, 153);
       noStroke();
-      let petalCount = 12;
+      let petalCount = 14;
       for (let i = 0; i < petalCount; i++) {
         let angle = (TWO_PI / petalCount) * i;
         push();
         rotate(angle);
-        ellipse(0, -this.size * 0.35, this.size * 0.18, this.size * 0.45);
+        ellipse(0, -this.size * 0.3, this.size * 0.16, this.size * 0.4);
         pop();
       }
       fill(250, 204, 21);
-      circle(0, 0, this.size * 0.3);
+      circle(0, 0, this.size * 0.28);
 
-      // Aura de perigo / Invasão
+      // Aura de alerta ecológico
       noFill();
-      stroke(239, 68, 68, 120 + sin(frameCount * 0.1) * 80);
+      stroke(239, 68, 68, 130 + sin(frameCount * 0.1) * 70);
       strokeWeight(1.5);
-      ellipse(0, 0, this.size * 1.2, this.size * 0.8);
+      ellipse(0, 0, this.size * 1.25, this.size * 1.25);
 
     } else {
-      // --- PLANTA NATIVA: FLORA NATIVA (Margarida / Alfazema Nativa) ---
-      // Haste e folhas suaves
-      stroke(21, 128, 61);
-      strokeWeight(3);
-      line(0, 0, 0, -this.size * 0.4);
-
-      // Pétalas delicadas arredondadas
+      // --- ESPÉCIE NATIVA: FLORA NATIVA (Vista Aérea Top-Down) ---
+      // Folhas de base verdes
+      fill(22, 163, 74);
       noStroke();
+      for (let i = 0; i < 5; i++) {
+        push();
+        rotate((TWO_PI / 5) * i);
+        ellipse(0, -this.size * 0.35, this.size * 0.25, this.size * 0.5);
+        pop();
+      }
+
+      // Pétalas de margarida suave delicadas
       fill(255, 255, 255);
-      let petalCount = 7;
+      let petalCount = 8;
       for (let i = 0; i < petalCount; i++) {
-        let angle = (TWO_PI / petalCount) * i + sin(frameCount * 0.03 + this.x) * 0.08;
+        let angle = (TWO_PI / petalCount) * i + sin(frameCount * 0.03 + this.y) * 0.06;
         push();
         rotate(angle);
-        ellipse(0, -this.size * 0.45, this.size * 0.3, this.size * 0.5);
+        ellipse(0, -this.size * 0.4, this.size * 0.28, this.size * 0.48);
         pop();
       }
 
       // Centro dourado saudável
       fill(245, 158, 11);
-      circle(0, -this.size * 0.45, this.size * 0.35);
+      circle(0, 0, this.size * 0.32);
 
-      // Aura ecológica verde suave
+      // Aura protetora verde suave
       noFill();
-      stroke(52, 211, 153, 100);
+      stroke(52, 211, 153, 110);
       strokeWeight(1);
-      circle(0, -this.size * 0.45, this.size * 1.1);
+      circle(0, 0, this.size * 1.15);
     }
 
     pop();
@@ -206,8 +211,8 @@ class Particle {
   constructor(x, y, col) {
     this.x = x;
     this.y = y;
-    this.vx = random(-4, 4);
-    this.vy = random(-5, 2);
+    this.vx = random(-4.5, 4.5);
+    this.vy = random(-4.5, 4.5);
     this.alpha = 255;
     this.col = col;
     this.size = random(4, 9);
@@ -216,8 +221,9 @@ class Particle {
   update() {
     this.x += this.vx;
     this.y += this.vy;
-    this.vy += 0.15; // gravidade
-    this.alpha -= 8;
+    this.vx *= 0.96;
+    this.vy *= 0.96;
+    this.alpha -= 7;
   }
 
   draw() {
@@ -242,7 +248,7 @@ function setup() {
 
 // --- CICLO PRINCIPAL (DRAW) ---
 function draw() {
-  background(15, 23, 42); // Fundo escuro azul-noite moderno
+  background(20, 27, 38); // Fundo escuro azul-noite de mapa terrestre
 
   // Obter nível atual do microfone
   if (mic) {
@@ -267,55 +273,51 @@ function draw() {
 
 // --- ECRÃ 1: INÍCIO E INSTRUÇÕES ---
 function drawStartScreen() {
-  // Fundo com relva estilizada
-  drawEnvironmentBackground();
+  drawTopDownTerrestrialBackground();
 
-  // Painel Central
   push();
-  fill(30, 41, 59, 230);
+  fill(30, 41, 59, 235);
   stroke(51, 65, 85);
   strokeWeight(2);
-  rect(100, 40, width - 200, height - 90, 16);
+  rect(90, 35, width - 180, height - 80, 16);
 
-  // Título do Exercício
   textAlign(CENTER, TOP);
   fill(52, 211, 153);
   textSize(30);
   textStyle(BOLD);
-  text("PURIFICADOR DE SOLOS", width / 2, 60);
+  text("PURIFICADOR DE SOLOS (VISTA AÉREA)", width / 2, 55);
 
   fill(226, 232, 240);
   textSize(16);
   textStyle(NORMAL);
-  text("Controlo de Espécies Vegetais Invasoras", width / 2, 100);
+  text("Controlo de Espécies Invasoras em Mapa Top-Down", width / 2, 95);
 
-  // Instruções e Objetivos
   textAlign(LEFT, TOP);
-  let startY = 135;
+  let startY = 130;
   textSize(14);
   fill(203, 213, 225);
 
-  text("OBJETIVO DO EXERCÍCIO:", 130, startY);
+  text("OBJETIVO DO EXERCÍCIO:", 120, startY);
   fill(241, 245, 249);
-  text("• Assuma o papel de Purificador de Solos e elimine as espécies invasoras (Chorão-das-praias).", 140, startY + 22);
-  text("• PRESERVE a flora nativa! Atingir plantas nativas faz perder vidas.", 140, startY + 42);
+  text("• Assuma o papel de Purificador de Solos e elimine as espécies invasoras (Chorão-das-praias).", 130, startY + 22);
+  text("• PRESERVE a flora nativa! Atingir plantas nativas faz perder vidas.", 130, startY + 42);
 
   fill(203, 213, 225);
-  text("CONTROLO MULTIMÉDIA (RATO + MICROFONE):", 130, startY + 75);
+  text("CONTROLOS MULTIMÉDIA (RATO + MICROFONE):", 120, startY + 75);
   fill(241, 245, 249);
-  text("• Mira do Laser: Movimento do Rato.", 140, startY + 97);
-  text("• Disparo do Laser: Som audível ou Palmas no Microfone (com Calibração e Histerese).", 140, startY + 117);
-  text("  (Tecla [ESPAÇO] ou Clique no Rato funcionam como controlo alternativo).", 140, startY + 137);
+  text("• Mira do Laser: Movimento do Rato sobre o mapa aéreo.", 130, startY + 97);
+  text("• Disparo: Palma, Estalar de Dedos, Assobio ou Som Audível (Controlo por Histerese).", 130, startY + 117);
+  text("  (Tecla [ESPAÇO] ou Clique no Rato funcionam como controlo de teste).", 130, startY + 137);
 
   fill(251, 191, 36);
-  text("FUNCIONALIDADE ORIGINAL - COMBOS DE PURIFICAÇÃO:", 130, startY + 170);
+  text("FUNCIONALIDADE ORIGINAL - COMBOS DE PURIFICAÇÃO:", 120, startY + 170);
   fill(241, 245, 249);
-  text("• Elimine 3 plantas invasoras consecutivas em menos de 5 segundos para ativar o", 140, startY + 192);
-  text("  LASER REFORÇADO com o dobro do raio de destruição no disparo seguinte!", 140, startY + 210);
+  text("• Elimine 3 plantas invasoras consecutivas em menos de 5 segundos para ativar o", 130, startY + 192);
+  text("  SUPER LASER com o dobro do raio de destruição no próximo disparo!", 130, startY + 210);
 
   // Botão de Iniciar Calibração
   let btnX = width / 2 - 130;
-  let btnY = 465;
+  let btnY = 470;
   let btnW = 260;
   let btnH = 50;
 
@@ -337,7 +339,7 @@ function drawStartScreen() {
 
 // --- ECRÃ DE CALIBRAÇÃO (MEDIR RUÍDO DE FUNDO) ---
 function drawCalibrateScreen() {
-  drawEnvironmentBackground();
+  drawTopDownTerrestrialBackground();
 
   push();
   fill(30, 41, 59, 240);
@@ -356,7 +358,6 @@ function drawCalibrateScreen() {
   textStyle(NORMAL);
   text("Mantenha o ambiente em silêncio para captar o ruído de fundo...", width / 2, 195);
 
-  // Barra de Progresso de Calibração
   calibFrames++;
   calibSum += micLevel;
 
@@ -366,19 +367,15 @@ function drawCalibrateScreen() {
   fill(16, 185, 129);
   rect(200, 240, (width - 400) * progress, 24, 12);
 
-  // Nível instantâneo do mic
   fill(203, 213, 225);
   textSize(14);
   text(`Ruído Amostrado: ${(micLevel * 100).toFixed(1)}%`, width / 2, 280);
 
-  // Quando termina a amostragem
   if (calibFrames >= MAX_CALIB_FRAMES) {
     ambientLevel = calibSum / MAX_CALIB_FRAMES;
-    // Calcular limites com Histerese
     highThreshold = constrain(ambientLevel * 3.2 + 0.10, 0.12, 0.85);
     lowThreshold = highThreshold * 0.45;
     
-    // Avançar para o jogo
     gameState = STATE_PLAY;
     resetGameData();
   }
@@ -387,21 +384,21 @@ function drawCalibrateScreen() {
   drawFooterUI();
 }
 
-// --- ECRÃ 2: EXECUÇÃO (JOGO JOGÁVEL) ---
+// --- ECRÃ 2: EXECUÇÃO (JOGO JOGÁVEL EM VISTA AÉREA) ---
 function updateAndDrawPlayScreen() {
-  drawEnvironmentBackground();
+  drawTopDownTerrestrialBackground();
 
-  // --- LÓGICA DE GERMANAÇÃO DE PLANTAS ---
+  // --- SPAWN ALEATÓRIO DE PLANTAS EM TODO O TERRENO ---
   spawnTimer++;
   if (spawnTimer >= spawnInterval) {
     spawnTimer = 0;
+    // Posições no mapa aéreo (evitando apenas a barra HUD no topo)
     let spawnX = random(60, width - 60);
-    let spawnY = height - 85;
+    let spawnY = random(85, height - 60);
     let plantType = random() < 0.65 ? 'INVASIVE' : 'NATIVE';
     plants.push(new Plant(spawnX, spawnY, plantType));
 
-    // Aumentar ligeiramente a dificuldade com o tempo
-    if (spawnInterval > 45) spawnInterval -= 0.5;
+    if (spawnInterval > 40) spawnInterval -= 0.5;
   }
 
   // --- ATUALIZAR E DESENHAR PLANTAS ---
@@ -426,39 +423,31 @@ function updateAndDrawPlayScreen() {
   // --- LÓGICA DE DISPARO DE ÁUDIO COM HISTERESE ---
   checkAudioHysteresis();
 
-  // --- ANIMAÇÃO VISUAL DO LASER ---
+  // --- ANIMAÇÃO VISUAL DO LASER ORBITAL ---
   if (laserAnim) {
-    drawLaserBeam(laserAnim.x, laserAnim.y, laserAnim.radius, laserAnim.isBoosted);
+    drawLaserBlast(laserAnim.x, laserAnim.y, laserAnim.radius, laserAnim.isBoosted);
     laserAnim.life--;
     if (laserAnim.life <= 0) laserAnim = null;
   }
 
-  // --- VERIFICAR CONDIÇÃO DE FIM DE JOGO ---
   if (lives <= 0) {
     gameState = STATE_GAMEOVER;
   }
 
-  // --- INTERFACE DE JOGO (HUD NO TOPO) ---
   drawPlayHUD();
-
-  // --- MIRA DO LASER SEGUINDO O RATO ---
   drawCrosshair(mouseX, mouseY);
-
-  // --- TEXTOS OBRIGATÓRIOS DO ENUNCIADO ---
   drawFooterUI();
 }
 
 // --- LÓGICA DE DISPARO POR ÁUDIO (HISTERESE) ---
 function checkAudioHysteresis() {
-  // Disparo quando excede o limite superior (High Threshold)
   if (micLevel >= highThreshold && canFireAudio) {
     triggerLaserShot(mouseX, mouseY);
-    canFireAudio = false; // Tranca a histerese para evitar múltiplos disparos no mesmo som
+    canFireAudio = false; // Tranca a histerese
   }
 
-  // Reinício do gatilho apenas quando cai abaixo do limite inferior (Low Threshold)
   if (micLevel < lowThreshold) {
-    canFireAudio = true;
+    canFireAudio = true; // Reinicia gatilho
   }
 }
 
@@ -467,68 +456,48 @@ function triggerLaserShot(targetX, targetY) {
   initAudioSynth();
   playSound('laser');
 
-  // Limpar timestamps antigos do combo (mais de 5 segundos)
   let now = millis();
   recentInvasiveTimestamps = recentInvasiveTimestamps.filter(t => now - t <= COMBO_TIME_WINDOW);
 
-  // Determinar raio de destruição
   let currentRadius = hasComboBonus ? BOOSTED_LASER_RADIUS : NORMAL_LASER_RADIUS;
   let isBoostedShot = hasComboBonus;
 
-  // Animação do raio laser
-  laserAnim = { x: targetX, y: targetY, radius: currentRadius, life: 12, isBoosted: isBoostedShot };
+  laserAnim = { x: targetX, y: targetY, radius: currentRadius, life: 14, isBoosted: isBoostedShot };
 
-  // Consumir bónus de combo se usado
   if (hasComboBonus) {
     hasComboBonus = false;
   }
 
-  let hitInvasiveThisShot = false;
-
-  // Processar colisões com a área de impacto do laser
   for (let i = plants.length - 1; i >= 0; i--) {
     let p = plants[i];
     let d = dist(targetX, targetY, p.x, p.y);
 
     if (d <= currentRadius + p.size / 2) {
       if (p.type === 'INVASIVE') {
-        // Purificar Planta Invasora!
         score += 10;
         purifiedCount++;
-        hitInvasiveThisShot = true;
-
-        // Efeito visual de partículas verdes/ciano
         createExplosion(p.x, p.y, color(52, 211, 153));
         playSound('hit_invasive');
-
-        // Adicionar timestamp para o sistema de combos
         recentInvasiveTimestamps.push(now);
-
       } else if (p.type === 'NATIVE') {
-        // Dano acidental em Planta Nativa!
         lives--;
         nativeHitsCount++;
-        recentInvasiveTimestamps = []; // Reiniciar combo ao atingir nativa
-
-        // Efeito visual vermelho de aviso
+        recentInvasiveTimestamps = [];
         createExplosion(p.x, p.y, color(239, 68, 68));
         playSound('hit_native');
       }
-
       plants.splice(i, 1);
     }
   }
 
-  // Verificar ativação do Combo de Purificação (3 invasoras em < 5 seg)
   if (recentInvasiveTimestamps.length >= 3) {
     hasComboBonus = true;
-    recentInvasiveTimestamps = []; // Consumido para ativar o bónus
+    recentInvasiveTimestamps = [];
     maxComboAchieved++;
     playSound('combo');
   }
 }
 
-// --- DISPARO MANUAL (TECLADO / RATO COMO ALTERNATIVA) ---
 function keyPressed() {
   if (key === ' ' && gameState === STATE_PLAY) {
     triggerLaserShot(mouseX, mouseY);
@@ -539,7 +508,7 @@ function mousePressed() {
   initAudioSynth();
   if (gameState === STATE_START) {
     let btnX = width / 2 - 130;
-    let btnY = 465;
+    let btnY = 470;
     let btnW = 260;
     let btnH = 50;
     if (mouseX > btnX && mouseX < btnX + btnW && mouseY > btnY && mouseY < btnY + btnH) {
@@ -561,30 +530,30 @@ function mousePressed() {
   }
 }
 
-// --- CRIAR PARTÍCULAS DE EXPLOSÃO ---
 function createExplosion(x, y, col) {
-  for (let i = 0; i < 16; i++) {
+  for (let i = 0; i < 18; i++) {
     particles.push(new Particle(x, y, col));
   }
 }
 
-// --- DESENHAR RAIO LASER ---
-function drawLaserBeam(x, y, radius, isBoosted) {
+// --- DESENHAR IMPACTO DO LASER (VISTA AÉREA) ---
+function drawLaserBlast(x, y, radius, isBoosted) {
   push();
-  // Raio proveniente do topo do ecrã até ao alvo
-  strokeWeight(isBoosted ? 12 : 5);
-  stroke(isBoosted ? color(251, 191, 36, 220) : color(56, 189, 248, 220));
-  line(x, 0, x, y);
+  // Raio laser vertical vindo do espaço orbital
+  strokeWeight(isBoosted ? 16 : 8);
+  stroke(isBoosted ? color(251, 191, 36, 230) : color(56, 189, 248, 230));
+  line(x, y - 300, x, y);
 
-  // Anel de impacto no chão
-  fill(isBoosted ? color(251, 191, 36, 100) : color(56, 189, 248, 80));
+  // Anéis concêntricos de explosão no chão
+  fill(isBoosted ? color(251, 191, 36, 120) : color(56, 189, 248, 90));
   stroke(isBoosted ? color(251, 191, 36) : color(56, 189, 248));
-  strokeWeight(2);
-  ellipse(x, y, radius * 2, radius * 1.2);
+  strokeWeight(3);
+  circle(x, y, radius * 2);
+  circle(x, y, radius * 1.2);
   pop();
 }
 
-// --- DESENHAR MIRA CUSTOMIZADA ---
+// --- DESENHAR MIRA TOP-DOWN ---
 function drawCrosshair(x, y) {
   push();
   translate(x, y);
@@ -594,26 +563,25 @@ function drawCrosshair(x, y) {
   strokeWeight(2);
   noFill();
 
-  // Anel exterior
-  circle(0, 0, isBoost ? 46 : 30);
+  // Anéis de mira
+  circle(0, 0, isBoost ? 50 : 32);
+  circle(0, 0, isBoost ? 24 : 16);
 
   // Retículo central
-  line(-20, 0, -8, 0);
-  line(8, 0, 20, 0);
-  line(0, -20, 0, -8);
-  line(0, 8, 0, 20);
+  line(-22, 0, -10, 0);
+  line(10, 0, 22, 0);
+  line(0, -22, 0, -10);
+  line(0, 10, 0, 22);
 
-  // Ponto central
   fill(isBoost ? color(251, 191, 36) : color(239, 68, 68));
   circle(0, 0, 4);
 
-  // Indicador de Combo Pronto
   if (isBoost) {
     textAlign(CENTER, BOTTOM);
     textSize(11);
     textStyle(BOLD);
     fill(251, 191, 36);
-    text("SUPER LASER PRONTO!", 0, -26);
+    text("SUPER LASER AÉREO PRONTO!", 0, -28);
   }
   pop();
 }
@@ -621,12 +589,10 @@ function drawCrosshair(x, y) {
 // --- INTERFACE HUD DE JOGO ---
 function drawPlayHUD() {
   push();
-  // Barra Superior
-  fill(15, 23, 42, 220);
+  fill(15, 23, 42, 225);
   noStroke();
   rect(0, 0, width, 55);
 
-  // Pontuação e Vidas
   textAlign(LEFT, CENTER);
   textSize(18);
   textStyle(BOLD);
@@ -637,18 +603,17 @@ function drawPlayHUD() {
   let heartStr = "♥ ".repeat(max(0, lives));
   text(`Vidas: ${heartStr}`, 200, 28);
 
-  // Indicador de Combos
   fill(251, 191, 36);
   textSize(14);
   if (hasComboBonus) {
-    text("COMBO ACTIVADO! (Raio Extra no próximo disparo)", 360, 28);
+    text("COMBO ACTIVADO! (Raio Extra no próximo disparo)", 350, 28);
   } else {
     let recentHits = recentInvasiveTimestamps.length;
     fill(148, 163, 184);
-    text(`Combo Sequência: ${recentHits}/3 (janela < 5s)`, 360, 28);
+    text(`Combo Sequência: ${recentHits}/3 (< 5s)`, 350, 28);
   }
 
-  // Vu-Metro do Microfone com Limites de Histerese
+  // Vu-Metro com Histerese
   let meterX = width - 210;
   let meterY = 18;
   let meterW = 180;
@@ -659,34 +624,32 @@ function drawPlayHUD() {
   strokeWeight(1);
   rect(meterX, meterY, meterW, meterH, 6);
 
-  // Nível atual de áudio
   let fillW = constrain(micLevel * meterW * 2.5, 0, meterW);
   fill(canFireAudio ? color(16, 185, 129) : color(245, 158, 11));
   noStroke();
   rect(meterX, meterY, fillW, meterH, 6);
 
-  // Linhas dos Limites de Histerese
   let highLineX = meterX + constrain(highThreshold * meterW * 2.5, 0, meterW);
   let lowLineX = meterX + constrain(lowThreshold * meterW * 2.5, 0, meterW);
 
-  stroke(239, 68, 68); // Limite Superior (Disparo)
+  stroke(239, 68, 68);
   strokeWeight(2);
   line(highLineX, meterY - 2, highLineX, meterY + meterH + 2);
 
-  stroke(251, 191, 36); // Limite Inferior (Reset Histerese)
+  stroke(251, 191, 36);
   line(lowLineX, meterY - 2, lowLineX, meterY + meterH + 2);
 
   textAlign(CENTER, TOP);
   textSize(10);
   fill(148, 163, 184);
   noStroke();
-  text("Sensibilidade Mic & Histerese", meterX + meterW / 2, meterY + meterH + 4);
+  text("Palma / Assobio / Estalo & Histerese", meterX + meterW / 2, meterY + meterH + 4);
   pop();
 }
 
 // --- ECRÃ 3: RESULTADO / REPETIR (GAME OVER) ---
 function drawGameOverScreen() {
-  drawEnvironmentBackground();
+  drawTopDownTerrestrialBackground();
 
   push();
   fill(30, 41, 59, 240);
@@ -703,9 +666,8 @@ function drawGameOverScreen() {
   fill(226, 232, 240);
   textSize(16);
   textStyle(NORMAL);
-  text("Relatório de Purificação do Solo", width / 2, 140);
+  text("Relatório de Purificação do Solo Aéreo", width / 2, 140);
 
-  // Estatísticas Finais
   textAlign(LEFT, TOP);
   let statY = 190;
   textSize(16);
@@ -732,7 +694,6 @@ function drawGameOverScreen() {
   fill(251, 191, 36);
   text(`${maxComboAchieved}`, 450, statY + 105);
 
-  // Botão Jogar Novamente
   let btnX = width / 2 - 120;
   let btnY = 440;
   let btnW = 240;
@@ -754,28 +715,27 @@ function drawGameOverScreen() {
   drawFooterUI();
 }
 
-// --- DESENHO DE AMBIENTE / CHÃO ---
-function drawEnvironmentBackground() {
-  // Céu gradiente escuro
-  noStroke();
-  fill(15, 23, 42);
-  rect(0, 0, width, height - 90);
+// --- DESENHO DE TERRENO EM VISTA AÉREA (TOP-DOWN MAP) ---
+function drawTopDownTerrestrialBackground() {
+  // Solo fértil com textura de relva/terra vista de cima
+  background(20, 35, 28);
 
-  // Solo / Terreno
-  fill(30, 41, 59);
-  rect(0, height - 90, width, 90);
-
-  // Relva e linha de solo
-  stroke(34, 197, 94);
-  strokeWeight(4);
-  line(0, height - 90, width, height - 90);
-
-  // Textura do solo
-  noStroke();
-  fill(51, 65, 85);
-  for (let x = 20; x < width; x += 40) {
-    ellipse(x, height - 40, 15, 6);
+  // Grelha suave de textura terrestre
+  stroke(28, 48, 38);
+  strokeWeight(1);
+  for (let x = 0; x < width; x += 50) {
+    line(x, 0, x, height);
   }
+  for (let y = 0; y < height; y += 50) {
+    line(0, y, width, y);
+  }
+
+  // Detalhes estáticos de pedras e manchas de solo
+  noStroke();
+  fill(15, 28, 22, 120);
+  ellipse(150, 200, 180, 140);
+  ellipse(700, 420, 220, 160);
+  ellipse(400, 500, 150, 110);
 }
 
 // --- TEXTOS DO RODAPÉ (EXIGÊNCIA RIGOROSA DO REQUISITO) ---
@@ -794,7 +754,6 @@ function drawFooterUI() {
   fill(52, 211, 153);
   text("Luís Lopes, nº 25361, ECGM", width - 15, height - 12);
   pop();
-
 }
 
 // --- REINICIAR DADOS DO JOGO ---
@@ -809,5 +768,5 @@ function resetGameData() {
   recentInvasiveTimestamps = [];
   hasComboBonus = false;
   spawnTimer = 0;
-  spawnInterval = 90;
+  spawnInterval = 75;
 }
