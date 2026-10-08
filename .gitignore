@@ -1,0 +1,15 @@
+# Ficheiros do Microsoft Word e ficheiros temporários do Office
+*.docx
+~$*
+
+# Enunciados e ficheiros PDF com nome original local
+Exercicio_Pratico_*.pdf
+EX. PRÁTICO_*.pdf
+
+# Ficheiros de rascunho e duplicados locais
+Relatorio.md
+*.md
+/esboco_low_fi.jpg
+
+# Pasta de backup local do código do jogo
+codigo_jogo_backup/
