@@ -38,7 +38,7 @@ let framesCalibracao = 0;
 const TOTAL_FRAMES_CALIBRACAO = 180;
 let somaRuidoCalibracao = 0;
 
-// --- 4. VARIÁVEIS DO JOGO ---
+// --- 4. VARIÁVEIS DO JOGO E FEEDBACK ---
 let pontuacao = 0;
 let vidas = 3;
 let invasorasEliminadas = 0;
@@ -47,10 +47,15 @@ let combosAtivados = 0;
 
 let plantas = [];
 let particulas = [];
+let textosFlutuantes = []; // Feedback visual dinâmico (+10, -1 Vida)
 let efeitoLaser = null;
 
 let temporizadorSpawn = 0;
 let intervaloSpawn = 80;
+
+// Temporizador de Sessão / Tempo de Jogo
+let tempoInicioJogo = 0;
+let tempoDecorridoJogo = 0;
 
 // --- 5. FUNCIONALIDADE ORIGINAL: COMBOS DE PURIFICAÇÃO ---
 // Eliminar 3 invasoras consecutivas em < 5 segundos = Super Laser no próximo tiro
@@ -271,6 +276,9 @@ function desenhaEcraCalibracao() {
 function atualizaEDesenhaJogo() {
   desenhaFundoTerreno();
 
+  // Atualizar temporizador de jogo decorrido
+  tempoDecorridoJogo = floor((millis() - tempoInicioJogo) / 1000);
+
   // Germinação aleatória de plantas
   temporizadorSpawn++;
   if (temporizadorSpawn >= intervaloSpawn) {
@@ -297,6 +305,14 @@ function atualizaEDesenhaJogo() {
     pt.atualiza();
     pt.desenha();
     if (pt.alpha <= 0) particulas.splice(i, 1);
+  }
+
+  // Atualizar e desenhar feedback de textos flutuantes
+  for (let i = textosFlutuantes.length - 1; i >= 0; i--) {
+    let tf = textosFlutuantes[i];
+    tf.atualiza();
+    tf.desenha();
+    if (tf.alpha <= 0) textosFlutuantes.splice(i, 1);
   }
 
   // Verificação contínua do disparo por áudio com Histerese
@@ -354,6 +370,7 @@ function dispararLaser(alvoX, alvoY) {
         pontuacao += 10;
         invasorasEliminadas++;
         criaExplosao(p.x, p.y, color(52, 211, 153));
+        textosFlutuantes.push(new TextoFlutuante(p.x, p.y - 15, "+10", color(52, 211, 153)));
         if (somAcerto) somAcerto.play();
         timestampsInvasoras.push(agora);
       } else if (p.tipo === 'NATIVA') {
@@ -362,6 +379,7 @@ function dispararLaser(alvoX, alvoY) {
         nativasAtingidas++;
         timestampsInvasoras = [];
         criaExplosao(p.x, p.y, color(239, 68, 68));
+        textosFlutuantes.push(new TextoFlutuante(p.x, p.y - 15, "-1 VIDA", color(239, 68, 68)));
         if (somDano) somDano.play();
       }
       plantas.splice(i, 1);
@@ -373,10 +391,11 @@ function dispararLaser(alvoX, alvoY) {
     temSuperLaser = true;
     timestampsInvasoras = [];
     combosAtivados++;
+    textosFlutuantes.push(new TextoFlutuante(width / 2, height / 2 - 40, "SUPER LASER ATIVADO!", color(251, 191, 36)));
   }
 }
 
-// Interface de Jogo (HUD no Topo)
+// Interface de Jogo (HUD no Topo com Feedback Completo)
 function desenhaHUDJogo() {
   push();
   fill(15, 23, 42, 225);
@@ -388,10 +407,10 @@ function desenhaHUDJogo() {
   textSize(18);
   textStyle(BOLD);
   fill(52, 211, 153);
-  text(`Pontuação: ${pontuacao}`, 20, 28);
+  text(`Pontos: ${pontuacao}`, 20, 28);
 
   // Vidas (com ícone gráfico heart.jpg)
-  let heartX = 210;
+  let heartX = 160;
   for (let i = 0; i < vidas; i++) {
     if (imgCoracao) {
       image(imgCoracao, heartX + i * 26, 16, 22, 22);
@@ -401,14 +420,22 @@ function desenhaHUDJogo() {
     }
   }
 
+  // Temporizador de Jogo Ativo (Feedback Constante Requisito 9)
+  let min = floor(tempoDecorridoJogo / 60);
+  let seg = tempoDecorridoJogo % 60;
+  let tempoStr = nf(min, 2) + ":" + nf(seg, 2);
+  fill(226, 232, 240);
+  textSize(15);
+  text(`Tempo: ${tempoStr}`, 275, 28);
+
   // Estado dos Combos
   textSize(14);
   if (temSuperLaser) {
     fill(251, 191, 36);
-    text("SUPER LASER ATIVADO! (Raio Dobrado)", 340, 28);
+    text("SUPER LASER ATIVO!", 420, 28);
   } else {
     fill(148, 163, 184);
-    text(`Combo Sequência: ${timestampsInvasoras.length}/3 (< 5s)`, 340, 28);
+    text(`Combo: ${timestampsInvasoras.length}/3 (< 5s)`, 420, 28);
   }
 
   // VU-Metro com limites de Histerese
@@ -458,7 +485,7 @@ function desenhaEcraFim() {
   text("Relatório de Purificação do Solo", width / 2, 140);
 
   textAlign(LEFT, TOP);
-  let sy = 190;
+  let sy = 185;
   textSize(16);
   fill(203, 213, 225);
 
@@ -469,23 +496,30 @@ function desenhaEcraFim() {
 
   fill(203, 213, 225);
   textStyle(NORMAL);
-  text(`• Invasoras Purificadas:`, 200, sy + 35);
+  text(`• Tempo de Sobrevivência:`, 200, sy + 32);
+  fill(226, 232, 240);
+  let min = floor(tempoDecorridoJogo / 60);
+  let seg = tempoDecorridoJogo % 60;
+  text(`${nf(min, 2)}m ${nf(seg, 2)}s`, 450, sy + 32);
+
+  fill(203, 213, 225);
+  text(`• Invasoras Purificadas:`, 200, sy + 64);
   fill(241, 245, 249);
-  text(`${invasorasEliminadas}`, 450, sy + 35);
+  text(`${invasorasEliminadas}`, 450, sy + 64);
 
   fill(203, 213, 225);
-  text(`• Danos em Plantas Nativas:`, 200, sy + 70);
+  text(`• Danos em Plantas Nativas:`, 200, sy + 96);
   fill(239, 68, 68);
-  text(`${nativasAtingidas}`, 450, sy + 70);
+  text(`${nativasAtingidas}`, 450, sy + 96);
 
   fill(203, 213, 225);
-  text(`• Combos Ativados:`, 200, sy + 105);
+  text(`• Combos Ativados:`, 200, sy + 128);
   fill(251, 191, 36);
-  text(`${combosAtivados}`, 450, sy + 105);
+  text(`${combosAtivados}`, 450, sy + 128);
 
   // Botão "REPETIR EXERCÍCIO"
   let btnX = width / 2 - 120;
-  let btnY = 440;
+  let btnY = 445;
   let btnW = 240;
   let btnH = 50;
 
@@ -527,7 +561,7 @@ function mousePressed() {
     // Permite disparo alternativo de teste por clique
     dispararLaser(mouseX, mouseY);
   } else if (estadoAtual === ESTADO_FIM) {
-    let btnX = width / 2 - 120, btnY = 440, btnW = 240, btnH = 50;
+    let btnX = width / 2 - 120, btnY = 445, btnW = 240, btnH = 50;
     if (mouseX > btnX && mouseX < btnX + btnW && mouseY > btnY && mouseY < btnY + btnH) {
       estadoAtual = ESTADO_JOGO;
       reiniciarDadosJogo();
@@ -536,7 +570,7 @@ function mousePressed() {
 }
 
 // =========================================================================
-// CLASSES DE OBJETOS: PLANTA E PARTÍCULA
+// CLASSES DE OBJETOS: PLANTA, PARTÍCULA E TEXTO FLUTUANTE
 // =========================================================================
 class Planta {
   constructor(x, y, tipo) {
@@ -559,23 +593,26 @@ class Planta {
   desenha() {
     push();
     imageMode(CENTER);
+    // Animação orgânica de pulso suave
+    let pulso = 1.0 + sin(frameCount * 0.05 + this.x) * 0.04;
+    let d = this.diam * pulso;
+
     if (this.tipo === 'INVASORA') {
       if (imgInvasora) {
-        image(imgInvasora, this.x, this.y, this.diam, this.diam);
+        image(imgInvasora, this.x, this.y, d, d);
       }
-      // Anel sutil de alerta
       noFill();
       stroke(239, 68, 68, 120);
       strokeWeight(1.5);
-      circle(this.x, this.y, this.diam + 4);
+      circle(this.x, this.y, d + 4);
     } else {
       if (imgNativa) {
-        image(imgNativa, this.x, this.y, this.diam, this.diam);
+        image(imgNativa, this.x, this.y, d, d);
       }
       noFill();
       stroke(52, 211, 153, 100);
       strokeWeight(1);
-      circle(this.x, this.y, this.diam + 4);
+      circle(this.x, this.y, d + 4);
     }
     pop();
   }
@@ -605,6 +642,33 @@ class Particula {
     noStroke();
     fill(red(this.col), green(this.col), blue(this.col), this.alpha);
     circle(this.x, this.y, this.tamanho);
+    pop();
+  }
+}
+
+// Classe de Feedback Visual Flutuante (+10, -1 Vida, Combo)
+class TextoFlutuante {
+  constructor(x, y, texto, cor) {
+    this.x = x;
+    this.y = y;
+    this.texto = texto;
+    this.cor = cor;
+    this.alpha = 255;
+    this.vy = -1.4;
+  }
+
+  atualiza() {
+    this.y += this.vy;
+    this.alpha -= 5;
+  }
+
+  desenha() {
+    push();
+    textAlign(CENTER, CENTER);
+    textSize(16);
+    textStyle(BOLD);
+    fill(red(this.cor), green(this.cor), blue(this.cor), this.alpha);
+    text(this.texto, this.x, this.y);
     pop();
   }
 }
@@ -683,8 +747,11 @@ function reiniciarDadosJogo() {
   combosAtivados = 0;
   plantas = [];
   particulas = [];
+  textosFlutuantes = [];
   timestampsInvasoras = [];
   temSuperLaser = false;
   temporizadorSpawn = 0;
   intervaloSpawn = 80;
+  tempoInicioJogo = millis();
+  tempoDecorridoJogo = 0;
 }
