@@ -14,6 +14,7 @@ const ESTADO_FIM = 3;
 let estadoAtual = ESTADO_INICIO;
 
 // --- 2. ASSETS MULTIMÉDIA (IMAGENS E SONS) ---
+let imgCampo; // Fundo real de campo verde
 let imgInvasora;
 let imgNativa;
 let imgMira;
@@ -28,9 +29,10 @@ let musicaIniciada = false;
 let mic;
 let micIniciado = false;
 let micLevel = 0;
+let micLevelAnterior = 0; // Para deteção de transiente / estalo de dedos
 let ruidoAmbiente = 0.02;
-let highThreshold = 0.12; // Limite superior para acionar disparo
-let lowThreshold = 0.05;  // Limite inferior para desarmar gatilho
+let highThreshold = 0.09; // Limite superior para acionar disparo
+let lowThreshold = 0.04;  // Limite inferior para desarmar gatilho
 let podeDispararAudio = true; // Controlo de histerese
 
 // Variáveis de Calibração (Amostragem durante 3 segundos a 60 FPS)
@@ -48,10 +50,13 @@ let combosAtivados = 0;
 let plantas = [];
 let particulas = [];
 let textosFlutuantes = []; // Feedback visual dinâmico (+10, -1 Vida)
+let zonasPurificadas = []; // Regeneração ecológica do solo purificado
+let ondasImpacto = [];     // Anéis de onda de impacto dos disparos
 let efeitoLaser = null;
 
 let temporizadorSpawn = 0;
 let intervaloSpawn = 80;
+let nivelJogo = 1;         // Dificuldade progressiva (Fases 1 a 4)
 
 // Temporizador de Sessão / Tempo de Jogo
 let tempoInicioJogo = 0;
@@ -67,7 +72,8 @@ const RAIO_LASER_SUPER = 100;
 
 // --- PRELOAD: CARREGAMENTO DOS ASSETS ---
 function preload() {
-  // Carregar Imagens dos Assets
+  // Carregar Imagens dos Assets (Interface e Entidades)
+  imgCampo = loadImage('assets/campo.jpg');
   imgInvasora = loadImage('assets/invasive.jpg');
   imgNativa = loadImage('assets/native.jpg');
   imgMira = loadImage('assets/target.jpg');
@@ -95,9 +101,10 @@ function setup() {
 function draw() {
   background(20, 27, 38);
 
-  // Leitura contínua do microfone
+  // Leitura contínua do microfone (sem smoothing para captar o estalo de dedos de forma instantânea)
   if (mic && micIniciado) {
-    micLevel = mic.getLevel();
+    micLevelAnterior = micLevel;
+    micLevel = mic.getLevel(0.0);
   }
 
   // Máquina de Estados
@@ -157,7 +164,7 @@ function desenhaEcraInicio() {
   text("CONTROLOS MULTIMÉDIA (RATO + MICROFONE):", 120, y + 70);
   fill(241, 245, 249);
   text("• Mira do Laser: Movimento do Rato.", 130, y + 90);
-  text("• Disparo: Som no Microfone (Palmas, Estalos de Dedos, Assobio).", 130, y + 108);
+  text("• Disparo por Áudio: Estalo de Dedos (ou palma rápida junto ao microfone).", 130, y + 108);
 
   fill(251, 191, 36);
   text("FUNCIONALIDADE ORIGINAL - COMBOS DE PURIFICAÇÃO:", 120, y + 140);
@@ -234,7 +241,7 @@ function desenhaEcraCalibracao() {
   fill(226, 232, 240);
   textSize(16);
   textStyle(NORMAL);
-  text("Mantenha silêncio para medir o ruído ambiente da sala...", width / 2, 195);
+  text("Mantenha silêncio... O jogo calibra-se para detetar os seus estalos de dedos!", width / 2, 195);
 
   framesCalibracao++;
   somaRuidoCalibracao += micLevel;
@@ -252,9 +259,9 @@ function desenhaEcraCalibracao() {
   // Terminou o período de amostragem
   if (framesCalibracao >= TOTAL_FRAMES_CALIBRACAO) {
     ruidoAmbiente = somaRuidoCalibracao / TOTAL_FRAMES_CALIBRACAO;
-    // Configurar limites de histerese baseados no ruído da sala
-    highThreshold = max(ruidoAmbiente * 2.6 + 0.07, 0.09);
-    lowThreshold = highThreshold * 0.45;
+    // Limites de histerese afinados para captar estalos de dedos com precisão
+    highThreshold = max(ruidoAmbiente * 2.2 + 0.045, 0.075);
+    lowThreshold = max(ruidoAmbiente * 1.25 + 0.015, 0.03);
 
     // Iniciar música de fundo e transitar para o jogo
     if (somFundo && !musicaIniciada) {
@@ -279,16 +286,26 @@ function atualizaEDesenhaJogo() {
   // Atualizar temporizador de jogo decorrido
   tempoDecorridoJogo = floor((millis() - tempoInicioJogo) / 1000);
 
-  // Germinação aleatória de plantas
+  // Gestão da dificuldade progressiva por fases
+  atualizaDificuldadeProgressiva();
+
+  // Atualizar e desenhar zonas de solo purificado (camada inferior do terreno)
+  for (let i = zonasPurificadas.length - 1; i >= 0; i--) {
+    let zp = zonasPurificadas[i];
+    zp.atualiza();
+    zp.desenha();
+    if (zp.vida <= 0) zonasPurificadas.splice(i, 1);
+  }
+
+  // Germinação com ritmo ajustado à fase de dificuldade
   temporizadorSpawn++;
   if (temporizadorSpawn >= intervaloSpawn) {
     temporizadorSpawn = 0;
     let px = random(60, width - 60);
     let py = random(85, height - 60);
-    let tipo = random() < 0.65 ? 'INVASORA' : 'NATIVA';
+    let probInvasora = nivelJogo >= 3 ? 0.72 : 0.65;
+    let tipo = random() < probInvasora ? 'INVASORA' : 'NATIVA';
     plantas.push(new Planta(px, py, tipo));
-
-    if (intervaloSpawn > 40) intervaloSpawn -= 0.5;
   }
 
   // Atualizar e desenhar plantas
@@ -307,6 +324,14 @@ function atualizaEDesenhaJogo() {
     if (pt.alpha <= 0) particulas.splice(i, 1);
   }
 
+  // Atualizar e desenhar ondas de impacto dos disparos
+  for (let i = ondasImpacto.length - 1; i >= 0; i--) {
+    let onda = ondasImpacto[i];
+    onda.atualiza();
+    onda.desenha();
+    if (onda.alpha <= 0) ondasImpacto.splice(i, 1);
+  }
+
   // Atualizar e desenhar feedback de textos flutuantes
   for (let i = textosFlutuantes.length - 1; i >= 0; i--) {
     let tf = textosFlutuantes[i];
@@ -315,7 +340,7 @@ function atualizaEDesenhaJogo() {
     if (tf.alpha <= 0) textosFlutuantes.splice(i, 1);
   }
 
-  // Verificação contínua do disparo por áudio com Histerese
+  // Verificação contínua do disparo por áudio com Histerese e Estalo de Dedos
   verificaDisparoHisterese();
 
   // Efeito visual do laser
@@ -334,14 +359,46 @@ function atualizaEDesenhaJogo() {
   desenhaRodape();
 }
 
-// Lógica de Histerese de Áudio
-function verificaDisparoHisterese() {
-  if (micLevel >= highThreshold && podeDispararAudio) {
-    dispararLaser(mouseX, mouseY);
-    podeDispararAudio = false; // Tranca até o som baixar
+// Dificuldade progressiva ao longo do tempo de sobrevivência e pontuação
+function atualizaDificuldadeProgressiva() {
+  let novoNivel = 1;
+  if (tempoDecorridoJogo >= 90 || pontuacao >= 400) {
+    novoNivel = 4;
+  } else if (tempoDecorridoJogo >= 50 || pontuacao >= 220) {
+    novoNivel = 3;
+  } else if (tempoDecorridoJogo >= 25 || pontuacao >= 100) {
+    novoNivel = 2;
   }
+
+  if (novoNivel > nivelJogo) {
+    nivelJogo = novoNivel;
+    const nomesFase = ["", "Recuperação", "Dispersão Ativa", "Infestação Severa", "Alerta Máximo"];
+    textosFlutuantes.push(new TextoFlutuante(width / 2, height / 2 - 25, `FASE ${nivelJogo}: ${nomesFase[nivelJogo].toUpperCase()}!`, color(56, 189, 248)));
+  }
+
+  switch (nivelJogo) {
+    case 1: intervaloSpawn = 80; break;
+    case 2: intervaloSpawn = 62; break;
+    case 3: intervaloSpawn = 48; break;
+    case 4: intervaloSpawn = 36; break;
+  }
+}
+
+// Lógica de Histerese de Áudio com Deteção de Estalo de Dedos (Transiente Rápido)
+function verificaDisparoHisterese() {
+  let deltaNivel = micLevel - micLevelAnterior;
+  // Um estalo de dedos caracteriza-se por um pico quase vertical num único frame (delta acentuado)
+  let ehEstalo = deltaNivel >= 0.038 && micLevel >= (ruidoAmbiente + 0.03);
+  let cruzouLimite = micLevel >= highThreshold;
+
+  if ((cruzouLimite || ehEstalo) && podeDispararAudio) {
+    dispararLaser(mouseX, mouseY);
+    podeDispararAudio = false; // Tranca temporariamente para evitar múltiplos disparos com um só estalo
+  }
+
+  // Rearme da histerese quando o ruído volta a níveis calmos
   if (micLevel < lowThreshold) {
-    podeDispararAudio = true; // Rearma o gatilho
+    podeDispararAudio = true;
   }
 }
 
@@ -354,6 +411,7 @@ function dispararLaser(alvoX, alvoY) {
   let disparoSuper = temSuperLaser;
 
   efeitoLaser = { x: alvoX, y: alvoY, raio: raioAtual, vida: 14, isSuper: disparoSuper };
+  ondasImpacto.push(new OndaImpacto(alvoX, alvoY, raioAtual, disparoSuper));
 
   if (temSuperLaser) {
     temSuperLaser = false;
@@ -370,6 +428,7 @@ function dispararLaser(alvoX, alvoY) {
         pontuacao += 10;
         invasorasEliminadas++;
         criaExplosao(p.x, p.y, color(52, 211, 153));
+        zonasPurificadas.push(new ZonaPurificada(p.x, p.y, p.diam));
         textosFlutuantes.push(new TextoFlutuante(p.x, p.y - 15, "+10", color(52, 211, 153)));
         if (somAcerto) somAcerto.play();
         timestampsInvasoras.push(agora);
@@ -395,28 +454,32 @@ function dispararLaser(alvoX, alvoY) {
   }
 }
 
-// Interface de Jogo (HUD no Topo com Feedback Completo)
+// Interface de Jogo (HUD no Topo com Feedback Completo sobre o campo verde)
 function desenhaHUDJogo() {
   push();
-  fill(15, 23, 42, 225);
+  // Barra sutil e translúcida para manter a imagem do campo verde visível por baixo
+  fill(10, 25, 18, 140);
   noStroke();
-  rect(0, 0, width, 55);
+  rect(0, 0, width, 52);
+  stroke(34, 197, 94, 50);
+  strokeWeight(1);
+  line(0, 52, width, 52);
 
   // Pontuação
   textAlign(LEFT, CENTER);
-  textSize(18);
+  textSize(16);
   textStyle(BOLD);
   fill(52, 211, 153);
-  text(`Pontos: ${pontuacao}`, 20, 28);
+  text(`Pontos: ${pontuacao}`, 16, 26);
 
   // Vidas (com ícone gráfico heart.jpg)
-  let heartX = 160;
+  let heartX = 140;
   for (let i = 0; i < vidas; i++) {
     if (imgCoracao) {
-      image(imgCoracao, heartX + i * 26, 16, 22, 22);
+      image(imgCoracao, heartX + i * 25, 15, 22, 22);
     } else {
       fill(239, 68, 68);
-      text("♥", heartX + i * 22, 28);
+      text("♥", heartX + i * 22, 26);
     }
   }
 
@@ -424,23 +487,32 @@ function desenhaHUDJogo() {
   let min = floor(tempoDecorridoJogo / 60);
   let seg = tempoDecorridoJogo % 60;
   let tempoStr = nf(min, 2) + ":" + nf(seg, 2);
-  fill(226, 232, 240);
-  textSize(15);
-  text(`Tempo: ${tempoStr}`, 275, 28);
+  fill(241, 245, 249);
+  textSize(14);
+  textStyle(NORMAL);
+  text(`Tempo: ${tempoStr}`, 235, 26);
+
+  // Fase / Nível de Dificuldade
+  let corNivel = nivelJogo === 1 ? color(52, 211, 153) : (nivelJogo === 2 ? color(56, 189, 248) : (nivelJogo === 3 ? color(251, 191, 36) : color(239, 68, 68)));
+  fill(corNivel);
+  textStyle(BOLD);
+  text(`Fase ${nivelJogo}`, 350, 26);
 
   // Estado dos Combos
-  textSize(14);
+  textStyle(NORMAL);
+  textSize(13);
   if (temSuperLaser) {
     fill(251, 191, 36);
-    text("SUPER LASER ATIVO!", 420, 28);
+    textStyle(BOLD);
+    text("SUPER LASER ATIVO!", 425, 26);
   } else {
-    fill(148, 163, 184);
-    text(`Combo: ${timestampsInvasoras.length}/3 (< 5s)`, 420, 28);
+    fill(203, 213, 225);
+    text(`Combo: ${timestampsInvasoras.length}/3 (<5s)`, 425, 26);
   }
 
-  // VU-Metro com limites de Histerese
-  let mx = width - 210, my = 18, mw = 180, mh = 18;
-  fill(30, 41, 59);
+  // VU-Metro com limites de Histerese (especializado para estalos de dedos)
+  let mx = width - 210, my = 17, mw = 180, mh = 18;
+  fill(15, 23, 42, 180);
   stroke(71, 85, 105);
   strokeWeight(1);
   rect(mx, my, mw, mh, 6);
@@ -485,37 +557,44 @@ function desenhaEcraFim() {
   text("Relatório de Purificação do Solo", width / 2, 140);
 
   textAlign(LEFT, TOP);
-  let sy = 185;
-  textSize(16);
+  let sy = 175;
+  let espaco = 26;
+  textSize(15.5);
   fill(203, 213, 225);
 
-  text(`• Pontuação Final:`, 200, sy);
+  text(`• Pontuação Final:`, 190, sy);
   fill(52, 211, 153);
   textStyle(BOLD);
-  text(`${pontuacao} pontos`, 420, sy);
+  text(`${pontuacao} pontos`, 440, sy);
 
   fill(203, 213, 225);
   textStyle(NORMAL);
-  text(`• Tempo de Sobrevivência:`, 200, sy + 32);
+  text(`• Tempo de Sobrevivência:`, 190, sy + espaco);
   fill(226, 232, 240);
   let min = floor(tempoDecorridoJogo / 60);
   let seg = tempoDecorridoJogo % 60;
-  text(`${nf(min, 2)}m ${nf(seg, 2)}s`, 450, sy + 32);
+  text(`${nf(min, 2)}m ${nf(seg, 2)}s`, 440, sy + espaco);
 
   fill(203, 213, 225);
-  text(`• Invasoras Purificadas:`, 200, sy + 64);
+  text(`• Fase Ecológica Atingida:`, 190, sy + espaco * 2);
+  const nomesFase = ["", "Recuperação", "Dispersão Ativa", "Infestação Severa", "Alerta Máximo"];
+  fill(56, 189, 248);
+  text(`Fase ${nivelJogo} (${nomesFase[nivelJogo]})`, 440, sy + espaco * 2);
+
+  fill(203, 213, 225);
+  text(`• Invasoras Purificadas:`, 190, sy + espaco * 3);
   fill(241, 245, 249);
-  text(`${invasorasEliminadas}`, 450, sy + 64);
+  text(`${invasorasEliminadas}`, 440, sy + espaco * 3);
 
   fill(203, 213, 225);
-  text(`• Danos em Plantas Nativas:`, 200, sy + 96);
+  text(`• Danos em Plantas Nativas:`, 190, sy + espaco * 4);
   fill(239, 68, 68);
-  text(`${nativasAtingidas}`, 450, sy + 96);
+  text(`${nativasAtingidas}`, 440, sy + espaco * 4);
 
   fill(203, 213, 225);
-  text(`• Combos Ativados:`, 200, sy + 128);
+  text(`• Combos Ativados:`, 190, sy + espaco * 5);
   fill(251, 191, 36);
-  text(`${combosAtivados}`, 450, sy + 128);
+  text(`${combosAtivados}`, 440, sy + espaco * 5);
 
   // Botão "REPETIR EXERCÍCIO"
   let btnX = width / 2 - 120;
@@ -673,6 +752,69 @@ class TextoFlutuante {
   }
 }
 
+// Classe de Regeneração Ecológica do Solo
+class ZonaPurificada {
+  constructor(x, y, raio) {
+    this.x = x;
+    this.y = y;
+    this.raio = raio;
+    this.vida = 80;
+    this.maxVida = 80;
+  }
+
+  atualiza() {
+    this.vida--;
+  }
+
+  desenha() {
+    push();
+    let progresso = this.vida / this.maxVida;
+    let alpha = progresso * 110;
+    noStroke();
+    fill(52, 211, 153, alpha);
+    circle(this.x, this.y, this.raio * 1.15);
+
+    // Pequenas partículas de pólen que sobem da terra regenerada
+    stroke(167, 243, 208, alpha * 1.5);
+    strokeWeight(2);
+    let subida = (1 - progresso) * 16;
+    point(this.x - 8, this.y - subida);
+    point(this.x + 8, this.y - subida * 1.1);
+    pop();
+  }
+}
+
+// Classe de Onda de Impacto / Choque do Disparo
+class OndaImpacto {
+  constructor(x, y, raioMaximo, isSuper) {
+    this.x = x;
+    this.y = y;
+    this.raioAtual = 6;
+    this.raioMaximo = raioMaximo;
+    this.isSuper = isSuper;
+    this.alpha = 240;
+  }
+
+  atualiza() {
+    this.raioAtual += (this.raioMaximo - this.raioAtual) * 0.25 + 1.2;
+    this.alpha -= 15;
+  }
+
+  desenha() {
+    push();
+    noFill();
+    if (this.isSuper) {
+      stroke(251, 191, 36, this.alpha);
+      strokeWeight(3.5);
+    } else {
+      stroke(56, 189, 248, this.alpha);
+      strokeWeight(2.2);
+    }
+    circle(this.x, this.y, this.raioAtual * 2);
+    pop();
+  }
+}
+
 function criaExplosao(x, y, col) {
   for (let i = 0; i < 16; i++) {
     particulas.push(new Particula(x, y, col));
@@ -712,13 +854,13 @@ function desenhaMira(x, y) {
   pop();
 }
 
-// Terreno quadriculado em vista aérea
+// Interface do terreno através de imagem real de campo verde (sem grelha codificada)
 function desenhaFundoTerreno() {
-  background(20, 35, 28);
-  stroke(28, 48, 38);
-  strokeWeight(1);
-  for (let x = 0; x < width; x += 50) line(x, 0, x, height);
-  for (let y = 0; y < height; y += 50) line(0, y, width, y);
+  if (imgCampo) {
+    image(imgCampo, 0, 0, width, height);
+  } else {
+    background(25, 55, 35);
+  }
 }
 
 // --- RODAPÉ OBRIGATÓRIO EM TODOS OS ECRÃS ---
@@ -748,10 +890,13 @@ function reiniciarDadosJogo() {
   plantas = [];
   particulas = [];
   textosFlutuantes = [];
+  zonasPurificadas = [];
+  ondasImpacto = [];
   timestampsInvasoras = [];
   temSuperLaser = false;
   temporizadorSpawn = 0;
   intervaloSpawn = 80;
+  nivelJogo = 1;
   tempoInicioJogo = millis();
   tempoDecorridoJogo = 0;
 }
