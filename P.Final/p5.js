@@ -1,11 +1,7 @@
-/* =========================================================================
-   PURIFICADOR DE SOLOS - CONTROLO DE ESPÉCIES INVASORAS
-   Unidade Curricular: Sistemas Multimédia (ECGM)
-   Autor: Luís Martinho Oliveira Lopes (Nº 25361)
-   Tema: Sustentabilidade e Ambiente (Controlo de Espécies Invasoras)
-   ========================================================================= */
+// Purificador de Solos - Controlo de Especies Invasoras
+// Luis Lopes, nº 25361, ECGM
 
-// --- 1. MÁQUINA DE ESTADOS (3 ECRÃS PRINCIPAIS) ---
+// estados possiveis do jogo
 const ESTADO_INICIO = 0;
 const ESTADO_CALIBRACAO = 1;
 const ESTADO_JOGO = 2;
@@ -13,8 +9,12 @@ const ESTADO_FIM = 3;
 
 let estadoAtual = ESTADO_INICIO;
 
-// --- 2. ASSETS MULTIMÉDIA (IMAGENS E SONS) ---
-let imgCampo; // Fundo real de campo verde
+// imagens e sons
+let imgCampo;
+let imgCardInicio;
+let imgCardFim;
+let imgCardCalibracao;
+let imgBarraAudio;
 let imgInvasora;
 let imgNativa;
 let imgMira;
@@ -25,22 +25,22 @@ let somAcerto;
 let somDano;
 let musicaIniciada = false;
 
-// --- 3. CONTROLO POR MICROFONE E HISTERESE ---
+// controlo por som do microfone e histerese
 let mic;
 let micIniciado = false;
 let micLevel = 0;
-let micLevelAnterior = 0; // Para deteção de transiente / estalo de dedos
+let micLevelAnterior = 0;
 let ruidoAmbiente = 0.02;
-let highThreshold = 0.09; // Limite superior para acionar disparo
-let lowThreshold = 0.04;  // Limite inferior para desarmar gatilho
-let podeDispararAudio = true; // Controlo de histerese
+let highThreshold = 0.09;
+let lowThreshold = 0.04;
+let podeDispararAudio = true;
 
-// Variáveis de Calibração (Amostragem durante 3 segundos a 60 FPS)
+// variaveis para medir o silencio da sala (3 segundos a 60 fps)
 let framesCalibracao = 0;
 const TOTAL_FRAMES_CALIBRACAO = 180;
 let somaRuidoCalibracao = 0;
 
-// --- 4. VARIÁVEIS DO JOGO E FEEDBACK ---
+// dados da partida
 let pontuacao = 0;
 let vidas = 3;
 let invasorasEliminadas = 0;
@@ -49,247 +49,90 @@ let combosAtivados = 0;
 
 let plantas = [];
 let particulas = [];
-let textosFlutuantes = []; // Feedback visual dinâmico (+10, -1 Vida)
-let zonasPurificadas = []; // Regeneração ecológica do solo purificado
-let ondasImpacto = [];     // Anéis de onda de impacto dos disparos
+let textosFlutuantes = [];
+let zonasPurificadas = [];
+let ondasImpacto = [];
 let efeitoLaser = null;
 
 let temporizadorSpawn = 0;
 let intervaloSpawn = 80;
-let nivelJogo = 1;         // Dificuldade progressiva (Fases 1 a 4)
+let nivelJogo = 1;
 
-// Temporizador de Sessão / Tempo de Jogo
+// temporizador da sessao
 let tempoInicioJogo = 0;
 let tempoDecorridoJogo = 0;
 
-// --- 5. FUNCIONALIDADE ORIGINAL: COMBOS DE PURIFICAÇÃO ---
-// Eliminar 3 invasoras consecutivas em < 5 segundos = Super Laser no próximo tiro
+// combo: eliminar 3 invasoras em menos de 5s da direito a super laser
 let timestampsInvasoras = [];
 let temSuperLaser = false;
-const JANELA_TEMPO_COMBO = 5000; // 5000 ms = 5 segundos
+const JANELA_TEMPO_COMBO = 5000;
 const RAIO_LASER_NORMAL = 45;
 const RAIO_LASER_SUPER = 100;
 
-// --- PRELOAD: CARREGAMENTO DOS ASSETS ---
+// carregar assets antes de iniciar
 function preload() {
-  // Carregar Imagens dos Assets (Interface e Entidades)
   imgCampo = loadImage('assets/campo.jpg');
-  imgInvasora = loadImage('assets/invasive.jpg');
-  imgNativa = loadImage('assets/native.jpg');
-  imgMira = loadImage('assets/target.jpg');
-  imgCoracao = loadImage('assets/heart.jpg');
+  imgCardInicio = loadImage('assets/card_inicio.png');
+  imgCardFim = loadImage('assets/card_fim.png');
+  imgCardCalibracao = loadImage('assets/card_calibracao.png');
+  imgBarraAudio = loadImage('assets/barra_audio.png');
+  imgInvasora = loadImage('assets/invasive.png');
+  imgNativa = loadImage('assets/native.png');
+  imgMira = loadImage('assets/target.png');
+  imgCoracao = loadImage('assets/heart.png');
 
-  // Carregar Ficheiros de Áudio
   soundFormats('mp3', 'wav');
   somFundo = loadSound('audio/fundo.mp3');
   somAcerto = loadSound('audio/acerto_invasora.wav');
   somDano = loadSound('audio/dano_nativa.wav');
 }
 
-// --- SETUP: INICIALIZAÇÃO DO CANVAS E DO ÁUDIO ---
+// inicializacao do canvas e do microfone
 function setup() {
   let canvas = createCanvas(900, 600);
   canvas.parent('game-container');
   textFont('Segoe UI');
-  noCursor(); // A mira substitui o cursor em todos os ecrãs
+  noCursor();
 
-  // Inicializar entrada de microfone
   mic = new p5.AudioIn();
 }
 
-// --- DRAW: CICLO PRINCIPAL DO PROGRAMA ---
+// loop principal
 function draw() {
-  background(20, 27, 38);
-
-  // Leitura contínua do microfone (sem smoothing para captar o estalo de dedos de forma instantânea)
+  // ler o microfone sem suavizacao para apanhar logo o pico do estalo
   if (mic && micIniciado) {
     micLevelAnterior = micLevel;
     micLevel = mic.getLevel(0.0);
   }
 
-  // Máquina de Estados
   switch (estadoAtual) {
     case ESTADO_INICIO:
-      desenhaEcraInicio();
+      desenhaEcraInicio(); // definido em instrucoes.js
       break;
     case ESTADO_CALIBRACAO:
-      desenhaEcraCalibracao();
+      desenhaEcraCalibracao(); // definido em instrucoes.js
       break;
     case ESTADO_JOGO:
       atualizaEDesenhaJogo();
       break;
     case ESTADO_FIM:
-      desenhaEcraFim();
+      desenhaEcraFim(); // definido em final.js
       break;
   }
 
-  // A mira personalizada é desenhada em todos os ecrãs
+  // mira segue sempre o rato
   desenhaMira(mouseX, mouseY);
 }
 
-// =========================================================================
-// ECRÃ 1: INÍCIO E INSTRUÇÕES
-// =========================================================================
-function desenhaEcraInicio() {
-  desenhaFundoTerreno();
-
-  push();
-  fill(30, 41, 59, 235);
-  stroke(51, 65, 85);
-  strokeWeight(2);
-  rect(90, 30, width - 180, height - 70, 16);
-
-  textAlign(CENTER, TOP);
-  fill(52, 211, 153);
-  textSize(28);
-  textStyle(BOLD);
-  text("PURIFICADOR DE SOLOS", width / 2, 50);
-
-  fill(226, 232, 240);
-  textSize(15);
-  textStyle(NORMAL);
-  text("Controlo de Espécies Invasoras em Vista Aérea", width / 2, 86);
-
-  textAlign(LEFT, TOP);
-  let y = 125;
-  textSize(13.5);
-  fill(203, 213, 225);
-
-  text("OBJETIVO DO EXERCÍCIO:", 120, y);
-  fill(241, 245, 249);
-  text("• Elimine as plantas invasoras (Chorão-das-praias) que surgem no solo.", 130, y + 20);
-  text("• PRESERVE a flora nativa! Atingir espécies nativas retira vidas.", 130, y + 38);
-
-  fill(203, 213, 225);
-  text("CONTROLOS MULTIMÉDIA (RATO + MICROFONE):", 120, y + 70);
-  fill(241, 245, 249);
-  text("• Mira do Laser: Movimento do Rato.", 130, y + 90);
-  text("• Disparo por Áudio: Estalo de Dedos (ou palma rápida junto ao microfone).", 130, y + 108);
-
-  fill(251, 191, 36);
-  text("FUNCIONALIDADE ORIGINAL - COMBOS DE PURIFICAÇÃO:", 120, y + 140);
-  fill(241, 245, 249);
-  text("• Elimine 3 invasoras consecutivas em menos de 5 segundos para ativar", 130, y + 160);
-  text("  o SUPER LASER com o dobro do raio de destruição no próximo disparo!", 130, y + 178);
-
-  // Barra de teste de microfone no ecrã inicial
-  desenhaBarraMicrofone(width / 2, 360);
-
-  // Botão "INICIAR CALIBRAÇÃO"
-  let btnX = width / 2 - 130;
-  let btnY = 460;
-  let btnW = 260;
-  let btnH = 50;
-
-  let hover = mouseX > btnX && mouseX < btnX + btnW && mouseY > btnY && mouseY < btnY + btnH;
-  fill(hover ? color(16, 185, 129) : color(5, 150, 105));
-  stroke(hover ? color(255) : color(52, 211, 153));
-  strokeWeight(hover ? 3 : 2);
-  rect(btnX, btnY, btnW, btnH, 12);
-
-  fill(255);
-  textAlign(CENTER, CENTER);
-  textSize(18);
-  textStyle(BOLD);
-  text("INICIAR CALIBRAÇÃO", width / 2, btnY + btnH / 2);
-  pop();
-
-  desenhaRodape();
-}
-
-// Barra visual para testar o microfone em tempo real
-function desenhaBarraMicrofone(cx, cy) {
-  push();
-  let w = 320, h = 16;
-  let x = cx - w / 2;
-
-  fill(15, 23, 42);
-  stroke(71, 85, 105);
-  strokeWeight(1);
-  rect(x, cy, w, h, 6);
-
-  let preenchimento = constrain(micLevel * w * 3.5, 0, w);
-  fill(micIniciado ? (micLevel > highThreshold ? color(239, 68, 68) : color(16, 185, 129)) : color(100));
-  noStroke();
-  rect(x, cy, preenchimento, h, 6);
-
-  textAlign(CENTER, BOTTOM);
-  textSize(11);
-  fill(148, 163, 184);
-  text(micIniciado ? `Microfone Ativo: ${(micLevel * 100).toFixed(1)}%` : "Clique no botão abaixo para ligar o microfone", cx, cy - 4);
-  pop();
-}
-
-// =========================================================================
-// ECRÃ DE CALIBRAÇÃO DE ÁUDIO
-// =========================================================================
-function desenhaEcraCalibracao() {
-  desenhaFundoTerreno();
-
-  push();
-  fill(30, 41, 59, 240);
-  stroke(52, 211, 153);
-  strokeWeight(2);
-  rect(150, 120, width - 300, 340, 16);
-
-  textAlign(CENTER, TOP);
-  fill(52, 211, 153);
-  textSize(26);
-  textStyle(BOLD);
-  text("CALIBRAÇÃO DE ÁUDIO", width / 2, 150);
-
-  fill(226, 232, 240);
-  textSize(16);
-  textStyle(NORMAL);
-  text("Mantenha silêncio... O jogo calibra-se para detetar os seus estalos de dedos!", width / 2, 195);
-
-  framesCalibracao++;
-  somaRuidoCalibracao += micLevel;
-
-  let progresso = framesCalibracao / TOTAL_FRAMES_CALIBRACAO;
-  fill(51, 65, 85);
-  rect(200, 240, width - 400, 24, 12);
-  fill(16, 185, 129);
-  rect(200, 240, (width - 400) * progresso, 24, 12);
-
-  fill(203, 213, 225);
-  textSize(14);
-  text(`Ruído Amostrado: ${(micLevel * 100).toFixed(1)}%`, width / 2, 280);
-
-  // Terminou o período de amostragem
-  if (framesCalibracao >= TOTAL_FRAMES_CALIBRACAO) {
-    ruidoAmbiente = somaRuidoCalibracao / TOTAL_FRAMES_CALIBRACAO;
-    // Limites de histerese afinados para captar estalos de dedos com precisão
-    highThreshold = max(ruidoAmbiente * 2.2 + 0.045, 0.075);
-    lowThreshold = max(ruidoAmbiente * 1.25 + 0.015, 0.03);
-
-    // Iniciar música de fundo e transitar para o jogo
-    if (somFundo && !musicaIniciada) {
-      somFundo.loop();
-      musicaIniciada = true;
-    }
-
-    estadoAtual = ESTADO_JOGO;
-    reiniciarDadosJogo();
-  }
-  pop();
-
-  desenhaRodape();
-}
-
-// =========================================================================
-// ECRÃ 2: EXECUÇÃO (JOGO EM VISTA AÉREA)
-// =========================================================================
+// loop do jogo principal
 function atualizaEDesenhaJogo() {
   desenhaFundoTerreno();
 
-  // Atualizar temporizador de jogo decorrido
   tempoDecorridoJogo = floor((millis() - tempoInicioJogo) / 1000);
 
-  // Gestão da dificuldade progressiva por fases
   atualizaDificuldadeProgressiva();
 
-  // Atualizar e desenhar zonas de solo purificado (camada inferior do terreno)
+  // desenhar as marcas de solo purificado
   for (let i = zonasPurificadas.length - 1; i >= 0; i--) {
     let zp = zonasPurificadas[i];
     zp.atualiza();
@@ -297,18 +140,34 @@ function atualizaEDesenhaJogo() {
     if (zp.vida <= 0) zonasPurificadas.splice(i, 1);
   }
 
-  // Germinação com ritmo ajustado à fase de dificuldade
+  // nascimento de plantas garantindo que nenhuma nasce em cima ou atras de outra
   temporizadorSpawn++;
   if (temporizadorSpawn >= intervaloSpawn) {
     temporizadorSpawn = 0;
-    let px = random(60, width - 60);
-    let py = random(85, height - 60);
+    let px, py;
+    let posicaoLivre = false;
+    let tentativas = 0;
+
+    // procura coordenadas livres com distancia minima de seguranca
+    while (!posicaoLivre && tentativas < 25) {
+      px = random(60, width - 60);
+      py = random(85, height - 65);
+      posicaoLivre = true;
+      for (let p of plantas) {
+        if (dist(px, py, p.x, p.y) < 75) {
+          posicaoLivre = false;
+          break;
+        }
+      }
+      tentativas++;
+    }
+
     let probInvasora = nivelJogo >= 3 ? 0.72 : 0.65;
     let tipo = random() < probInvasora ? 'INVASORA' : 'NATIVA';
     plantas.push(new Planta(px, py, tipo));
   }
 
-  // Atualizar e desenhar plantas
+  // atualizar e desenhar as plantas
   for (let i = plantas.length - 1; i >= 0; i--) {
     let p = plantas[i];
     p.atualiza();
@@ -316,7 +175,7 @@ function atualizaEDesenhaJogo() {
     if (!p.viva) plantas.splice(i, 1);
   }
 
-  // Atualizar e desenhar partículas
+  // particulas de explosao
   for (let i = particulas.length - 1; i >= 0; i--) {
     let pt = particulas[i];
     pt.atualiza();
@@ -324,7 +183,7 @@ function atualizaEDesenhaJogo() {
     if (pt.alpha <= 0) particulas.splice(i, 1);
   }
 
-  // Atualizar e desenhar ondas de impacto dos disparos
+  // ondas de impacto do laser
   for (let i = ondasImpacto.length - 1; i >= 0; i--) {
     let onda = ondasImpacto[i];
     onda.atualiza();
@@ -332,7 +191,7 @@ function atualizaEDesenhaJogo() {
     if (onda.alpha <= 0) ondasImpacto.splice(i, 1);
   }
 
-  // Atualizar e desenhar feedback de textos flutuantes
+  // textos flutuantes de pontos e avisos
   for (let i = textosFlutuantes.length - 1; i >= 0; i--) {
     let tf = textosFlutuantes[i];
     tf.atualiza();
@@ -340,17 +199,16 @@ function atualizaEDesenhaJogo() {
     if (tf.alpha <= 0) textosFlutuantes.splice(i, 1);
   }
 
-  // Verificação contínua do disparo por áudio com Histerese e Estalo de Dedos
+  // verificar se houve estalo de dedos para disparar
   verificaDisparoHisterese();
 
-  // Efeito visual do laser
+  // animacao do feixe laser
   if (efeitoLaser) {
     desenhaEfeitoLaser(efeitoLaser.x, efeitoLaser.y, efeitoLaser.raio, efeitoLaser.isSuper);
     efeitoLaser.vida--;
     if (efeitoLaser.vida <= 0) efeitoLaser = null;
   }
 
-  // Condição de fim de jogo
   if (vidas <= 0) {
     estadoAtual = ESTADO_FIM;
   }
@@ -359,7 +217,7 @@ function atualizaEDesenhaJogo() {
   desenhaRodape();
 }
 
-// Dificuldade progressiva ao longo do tempo de sobrevivência e pontuação
+// subir o nivel conforme o tempo passa
 function atualizaDificuldadeProgressiva() {
   let novoNivel = 1;
   if (tempoDecorridoJogo >= 90 || pontuacao >= 400) {
@@ -384,25 +242,23 @@ function atualizaDificuldadeProgressiva() {
   }
 }
 
-// Lógica de Histerese de Áudio com Deteção de Estalo de Dedos (Transiente Rápido)
+// detecao de estalo de dedos com histerese
 function verificaDisparoHisterese() {
   let deltaNivel = micLevel - micLevelAnterior;
-  // Um estalo de dedos caracteriza-se por um pico quase vertical num único frame (delta acentuado)
   let ehEstalo = deltaNivel >= 0.038 && micLevel >= (ruidoAmbiente + 0.03);
   let cruzouLimite = micLevel >= highThreshold;
 
   if ((cruzouLimite || ehEstalo) && podeDispararAudio) {
     dispararLaser(mouseX, mouseY);
-    podeDispararAudio = false; // Tranca temporariamente para evitar múltiplos disparos com um só estalo
+    podeDispararAudio = false;
   }
 
-  // Rearme da histerese quando o ruído volta a níveis calmos
   if (micLevel < lowThreshold) {
     podeDispararAudio = true;
   }
 }
 
-// Disparo do Laser Purificador
+// disparo do laser purificador
 function dispararLaser(alvoX, alvoY) {
   let agora = millis();
   timestampsInvasoras = timestampsInvasoras.filter(t => agora - t <= JANELA_TEMPO_COMBO);
@@ -417,14 +273,12 @@ function dispararLaser(alvoX, alvoY) {
     temSuperLaser = false;
   }
 
-  // Deteção de Colisões Circulares
   for (let i = plantas.length - 1; i >= 0; i--) {
     let p = plantas[i];
     let d = dist(alvoX, alvoY, p.x, p.y);
 
     if (d <= raioAtual + p.diam / 2) {
       if (p.tipo === 'INVASORA') {
-        // Acerto em invasora (Som Bom)
         pontuacao += 10;
         invasorasEliminadas++;
         criaExplosao(p.x, p.y, color(52, 211, 153));
@@ -433,7 +287,6 @@ function dispararLaser(alvoX, alvoY) {
         if (somAcerto) somAcerto.play();
         timestampsInvasoras.push(agora);
       } else if (p.tipo === 'NATIVA') {
-        // Dano em nativa (Som Mau)
         vidas--;
         nativasAtingidas++;
         timestampsInvasoras = [];
@@ -445,7 +298,6 @@ function dispararLaser(alvoX, alvoY) {
     }
   }
 
-  // Ativação do Combo (3 invasoras em < 5 seg)
   if (timestampsInvasoras.length >= 3) {
     temSuperLaser = true;
     timestampsInvasoras = [];
@@ -454,10 +306,9 @@ function dispararLaser(alvoX, alvoY) {
   }
 }
 
-// Interface de Jogo (HUD no Topo com Feedback Completo sobre o campo verde)
+// hud no topo sobre o campo verde
 function desenhaHUDJogo() {
   push();
-  // Barra sutil e translúcida para manter a imagem do campo verde visível por baixo
   fill(10, 25, 18, 140);
   noStroke();
   rect(0, 0, width, 52);
@@ -465,14 +316,12 @@ function desenhaHUDJogo() {
   strokeWeight(1);
   line(0, 52, width, 52);
 
-  // Pontuação
   textAlign(LEFT, CENTER);
   textSize(16);
   textStyle(BOLD);
   fill(52, 211, 153);
   text(`Pontos: ${pontuacao}`, 16, 26);
 
-  // Vidas (com ícone gráfico heart.jpg)
   let heartX = 140;
   for (let i = 0; i < vidas; i++) {
     if (imgCoracao) {
@@ -483,7 +332,6 @@ function desenhaHUDJogo() {
     }
   }
 
-  // Temporizador de Jogo Ativo (Feedback Constante Requisito 9)
   let min = floor(tempoDecorridoJogo / 60);
   let seg = tempoDecorridoJogo % 60;
   let tempoStr = nf(min, 2) + ":" + nf(seg, 2);
@@ -492,13 +340,11 @@ function desenhaHUDJogo() {
   textStyle(NORMAL);
   text(`Tempo: ${tempoStr}`, 235, 26);
 
-  // Fase / Nível de Dificuldade
   let corNivel = nivelJogo === 1 ? color(52, 211, 153) : (nivelJogo === 2 ? color(56, 189, 248) : (nivelJogo === 3 ? color(251, 191, 36) : color(239, 68, 68)));
   fill(corNivel);
   textStyle(BOLD);
   text(`Fase ${nivelJogo}`, 350, 26);
 
-  // Estado dos Combos
   textStyle(NORMAL);
   textSize(13);
   if (temSuperLaser) {
@@ -510,119 +356,29 @@ function desenhaHUDJogo() {
     text(`Combo: ${timestampsInvasoras.length}/3 (<5s)`, 425, 26);
   }
 
-  // VU-Metro com limites de Histerese (especializado para estalos de dedos)
-  let mx = width - 210, my = 17, mw = 180, mh = 18;
-  fill(15, 23, 42, 180);
-  stroke(71, 85, 105);
-  strokeWeight(1);
-  rect(mx, my, mw, mh, 6);
-
-  let fillW = constrain(micLevel * mw * 3.5, 0, mw);
+  // vu-metro de som no topo usando a moldura da barra
+  let mx = width - 195, my = 15, mw = 180, mh = 20;
+  if (imgBarraAudio) {
+    image(imgBarraAudio, mx, my, mw, mh);
+  }
+  let fillW = constrain(micLevel * (mw - 4) * 3.5, 0, mw - 4);
   fill(podeDispararAudio ? color(16, 185, 129) : color(245, 158, 11));
   noStroke();
-  rect(mx, my, fillW, mh, 6);
+  rect(mx + 2, my + 2, fillW, mh - 4, 4);
 
-  // Linhas de histerese
+  // marcadores de histerese
   stroke(239, 68, 68);
   strokeWeight(2);
-  let hx = mx + constrain(highThreshold * mw * 3.5, 0, mw);
-  let lx = mx + constrain(lowThreshold * mw * 3.5, 0, mw);
-  line(hx, my - 2, hx, my + mh + 2);
+  let hx = mx + constrain(highThreshold * (mw - 4) * 3.5, 0, mw - 4);
+  let lx = mx + constrain(lowThreshold * (mw - 4) * 3.5, 0, mw - 4);
+  line(hx, my, hx, my + mh);
   stroke(251, 191, 36);
-  line(lx, my - 2, lx, my + mh + 2);
+  line(lx, my, lx, my + mh);
   pop();
 }
 
-// =========================================================================
-// ECRÃ 3: RESULTADO / REPETIR (GAME OVER)
-// =========================================================================
-function desenhaEcraFim() {
-  desenhaFundoTerreno();
-
-  push();
-  fill(30, 41, 59, 240);
-  stroke(239, 68, 68);
-  strokeWeight(2);
-  rect(140, 70, width - 280, 460, 16);
-
-  textAlign(CENTER, TOP);
-  fill(239, 68, 68);
-  textSize(32);
-  textStyle(BOLD);
-  text("EXERCÍCIO CONCLUÍDO", width / 2, 95);
-
-  fill(226, 232, 240);
-  textSize(16);
-  textStyle(NORMAL);
-  text("Relatório de Purificação do Solo", width / 2, 140);
-
-  textAlign(LEFT, TOP);
-  let sy = 175;
-  let espaco = 26;
-  textSize(15.5);
-  fill(203, 213, 225);
-
-  text(`• Pontuação Final:`, 190, sy);
-  fill(52, 211, 153);
-  textStyle(BOLD);
-  text(`${pontuacao} pontos`, 440, sy);
-
-  fill(203, 213, 225);
-  textStyle(NORMAL);
-  text(`• Tempo de Sobrevivência:`, 190, sy + espaco);
-  fill(226, 232, 240);
-  let min = floor(tempoDecorridoJogo / 60);
-  let seg = tempoDecorridoJogo % 60;
-  text(`${nf(min, 2)}m ${nf(seg, 2)}s`, 440, sy + espaco);
-
-  fill(203, 213, 225);
-  text(`• Fase Ecológica Atingida:`, 190, sy + espaco * 2);
-  const nomesFase = ["", "Recuperação", "Dispersão Ativa", "Infestação Severa", "Alerta Máximo"];
-  fill(56, 189, 248);
-  text(`Fase ${nivelJogo} (${nomesFase[nivelJogo]})`, 440, sy + espaco * 2);
-
-  fill(203, 213, 225);
-  text(`• Invasoras Purificadas:`, 190, sy + espaco * 3);
-  fill(241, 245, 249);
-  text(`${invasorasEliminadas}`, 440, sy + espaco * 3);
-
-  fill(203, 213, 225);
-  text(`• Danos em Plantas Nativas:`, 190, sy + espaco * 4);
-  fill(239, 68, 68);
-  text(`${nativasAtingidas}`, 440, sy + espaco * 4);
-
-  fill(203, 213, 225);
-  text(`• Combos Ativados:`, 190, sy + espaco * 5);
-  fill(251, 191, 36);
-  text(`${combosAtivados}`, 440, sy + espaco * 5);
-
-  // Botão "REPETIR EXERCÍCIO"
-  let btnX = width / 2 - 120;
-  let btnY = 445;
-  let btnW = 240;
-  let btnH = 50;
-
-  let hover = mouseX > btnX && mouseX < btnX + btnW && mouseY > btnY && mouseY < btnY + btnH;
-  fill(hover ? color(59, 130, 246) : color(37, 99, 235));
-  stroke(hover ? color(255) : color(96, 165, 250));
-  strokeWeight(hover ? 3 : 2);
-  rect(btnX, btnY, btnW, btnH, 12);
-
-  fill(255);
-  textAlign(CENTER, CENTER);
-  textSize(18);
-  textStyle(BOLD);
-  text("REPETIR EXERCÍCIO", width / 2, btnY + btnH / 2);
-  pop();
-
-  desenhaRodape();
-}
-
-// =========================================================================
-// EVENTOS DE ENTRADA DO RATO
-// =========================================================================
+// cliques do rato servem apenas para os botoes dos menus
 function mousePressed() {
-  // Inicialização explícita de áudio requerida pelos navegadores
   userStartAudio().then(() => {
     if (mic && !micIniciado) {
       mic.start(() => { micIniciado = true; });
@@ -630,17 +386,14 @@ function mousePressed() {
   });
 
   if (estadoAtual === ESTADO_INICIO) {
-    let btnX = width / 2 - 130, btnY = 460, btnW = 260, btnH = 50;
+    let btnX = width / 2 - 120, btnY = 460, btnW = 240, btnH = 46;
     if (mouseX > btnX && mouseX < btnX + btnW && mouseY > btnY && mouseY < btnY + btnH) {
       estadoAtual = ESTADO_CALIBRACAO;
       framesCalibracao = 0;
       somaRuidoCalibracao = 0;
     }
-  } else if (estadoAtual === ESTADO_JOGO) {
-    // Permite disparo alternativo de teste por clique
-    dispararLaser(mouseX, mouseY);
   } else if (estadoAtual === ESTADO_FIM) {
-    let btnX = width / 2 - 120, btnY = 445, btnW = 240, btnH = 50;
+    let btnX = width / 2 - 110, btnY = 380, btnW = 220, btnH = 46;
     if (mouseX > btnX && mouseX < btnX + btnW && mouseY > btnY && mouseY < btnY + btnH) {
       estadoAtual = ESTADO_JOGO;
       reiniciarDadosJogo();
@@ -648,14 +401,12 @@ function mousePressed() {
   }
 }
 
-// =========================================================================
-// CLASSES DE OBJETOS: PLANTA, PARTÍCULA E TEXTO FLUTUANTE
-// =========================================================================
+// classes das entidades
 class Planta {
   constructor(x, y, tipo) {
     this.x = x;
     this.y = y;
-    this.tipo = tipo; // 'INVASORA' ou 'NATIVA'
+    this.tipo = tipo;
     this.diam = tipo === 'INVASORA' ? random(45, 60) : random(38, 50);
     this.viva = true;
     this.idade = 0;
@@ -672,7 +423,6 @@ class Planta {
   desenha() {
     push();
     imageMode(CENTER);
-    // Animação orgânica de pulso suave
     let pulso = 1.0 + sin(frameCount * 0.05 + this.x) * 0.04;
     let d = this.diam * pulso;
 
@@ -681,8 +431,10 @@ class Planta {
         image(imgInvasora, this.x, this.y, d, d);
       }
       noFill();
-      stroke(239, 68, 68, 120);
-      strokeWeight(1.5);
+      let urgente = this.idade > this.tempoMaximo * 0.75;
+      let alphaAlerta = urgente ? (sin(frameCount * 0.3) > 0 ? 255 : 60) : 120;
+      stroke(239, 68, 68, alphaAlerta);
+      strokeWeight(urgente ? 2.5 : 1.5);
       circle(this.x, this.y, d + 4);
     } else {
       if (imgNativa) {
@@ -725,7 +477,6 @@ class Particula {
   }
 }
 
-// Classe de Feedback Visual Flutuante (+10, -1 Vida, Combo)
 class TextoFlutuante {
   constructor(x, y, texto, cor) {
     this.x = x;
@@ -752,7 +503,6 @@ class TextoFlutuante {
   }
 }
 
-// Classe de Regeneração Ecológica do Solo
 class ZonaPurificada {
   constructor(x, y, raio) {
     this.x = x;
@@ -774,7 +524,6 @@ class ZonaPurificada {
     fill(52, 211, 153, alpha);
     circle(this.x, this.y, this.raio * 1.15);
 
-    // Pequenas partículas de pólen que sobem da terra regenerada
     stroke(167, 243, 208, alpha * 1.5);
     strokeWeight(2);
     let subida = (1 - progresso) * 16;
@@ -784,7 +533,6 @@ class ZonaPurificada {
   }
 }
 
-// Classe de Onda de Impacto / Choque do Disparo
 class OndaImpacto {
   constructor(x, y, raioMaximo, isSuper) {
     this.x = x;
@@ -821,7 +569,6 @@ function criaExplosao(x, y, col) {
   }
 }
 
-// Efeito do feixe laser orbital
 function desenhaEfeitoLaser(x, y, raio, isSuper) {
   push();
   strokeWeight(isSuper ? 14 : 7);
@@ -835,13 +582,15 @@ function desenhaEfeitoLaser(x, y, raio, isSuper) {
   pop();
 }
 
-// Mira personalizada com suporte ao asset target.jpg
 function desenhaMira(x, y) {
   push();
   imageMode(CENTER);
   let tamMira = temSuperLaser ? 48 : 34;
 
   if (imgMira) {
+    if (temSuperLaser) {
+      tint(251, 191, 36);
+    }
     image(imgMira, x, y, tamMira, tamMira);
   } else {
     stroke(temSuperLaser ? color(251, 191, 36) : color(239, 68, 68));
@@ -854,7 +603,6 @@ function desenhaMira(x, y) {
   pop();
 }
 
-// Interface do terreno através de imagem real de campo verde (sem grelha codificada)
 function desenhaFundoTerreno() {
   if (imgCampo) {
     image(imgCampo, 0, 0, width, height);
@@ -863,21 +611,29 @@ function desenhaFundoTerreno() {
   }
 }
 
-// --- RODAPÉ OBRIGATÓRIO EM TODOS OS ECRÃS ---
 function desenhaRodape() {
   push();
+  // Barra translucida na base para contraste e leitura perfeita
+  fill(10, 20, 15, 175);
+  noStroke();
+  rect(0, height - 28, width, 28);
+  stroke(255, 255, 255, 30);
+  strokeWeight(1);
+  line(0, height - 28, width, height - 28);
+
   textSize(13);
   textStyle(BOLD);
 
-  // Canto Inferior Esquerdo: Tema em inglês
-  textAlign(LEFT, BOTTOM);
-  fill(148, 163, 184);
-  text("Invasive Species Control", 15, height - 12);
+  // Tema em branco bem visivel no canto esquerdo
+  textAlign(LEFT, CENTER);
+  noStroke();
+  fill(255);
+  text("Invasive Species Control", 16, height - 14);
 
-  // Canto Inferior Direito: Nome, número e sigla
-  textAlign(RIGHT, BOTTOM);
-  fill(52, 211, 153);
-  text("Luís Lopes, nº 25361, ECGM", width - 15, height - 12);
+  // Nome e numero em amarelo dourado bem legivel no canto direito
+  textAlign(RIGHT, CENTER);
+  fill(251, 191, 36);
+  text("Luís Lopes, nº 25361, ECGM", width - 16, height - 14);
   pop();
 }
 
